@@ -36,9 +36,6 @@ on early-init
     # cgroup for system_server and surfaceflinger
     mkdir /dev/memcg/system 0550 system system
 
-    # for /lib/firmware
-    symlink system/lib /lib
-
     start ueventd
 
 on init
