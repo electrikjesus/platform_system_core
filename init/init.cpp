@@ -173,10 +173,10 @@ static int wait_for_coldboot_done_action(const std::vector<std::string>& args) {
     timeout = 5;
 #endif
     NOTICE("Waiting for %s...\n", COLDBOOT_DONE);
-    // Any longer than 1s is an unreasonable length of time to delay booting.
+    // Any longer than 10s is an unreasonable length of time to delay booting.
     // If you're hitting this timeout, check that you didn't make your
     // sepolicy regular expressions too expensive (http://b/19899875).
-    if (wait_for_file(COLDBOOT_DONE, timeout)) {
+    if (wait_for_file(COLDBOOT_DONE, 10)) {
         ERROR("Timed out waiting for %s\n", COLDBOOT_DONE);
     }
     NOTICE("Waiting for %s took %.2fs.\n", COLDBOOT_DONE, t.duration());
