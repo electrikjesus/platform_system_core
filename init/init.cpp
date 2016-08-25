@@ -546,6 +546,10 @@ static int charging_mode_booting(void) {
 }
 
 int main(int argc, char** argv) {
+    if (strstr(argv[0], "modprobe")) {
+        return modprobe_main(argc, argv);
+    }
+
     if (!strcmp(basename(argv[0]), "ueventd")) {
         return ueventd_main(argc, argv);
     }
