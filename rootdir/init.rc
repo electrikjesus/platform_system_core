@@ -3,6 +3,7 @@
 # IMPORTANT: Do not create world writable files or directories.
 # This is a common source of Android security bugs.
 #
+#
 
 import /init.environ.rc
 import /init.usb.rc
@@ -676,7 +677,7 @@ service console /system/bin/sh
     class core
     console
     disabled
-#   user shell
+    user shell
     group shell log readproc
     seclabel u:r:shell:s0
 
@@ -689,3 +690,15 @@ on property:ro.debuggable=1
 service flash_recovery /system/bin/install-recovery.sh
     class main
     oneshot
+    disabled
+    
+service su /system/xbin/su --install
+    class main
+    oneshot
+    user root
+    seclabel u:r:su:s0
+
+service daemonsu /system/xbin/su --daemon
+    class main
+    user root
+    seclabel u:r:su:s0
