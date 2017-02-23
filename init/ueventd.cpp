@@ -35,6 +35,8 @@
 #include "ueventd_parser.h"
 #include "property_service.h"
 
+std::string boot_device;
+
 int ueventd_main(int argc, char **argv)
 {
     /*
@@ -70,6 +72,9 @@ int ueventd_main(int argc, char **argv)
     if (pid < 0) {
         ERROR("could not fork to process firmware event: %s\n", strerror(errno));
     }
+    boot_device = property_get("ro.boot.bootdevice");
+
+    device_init();
 
     device_init(pid == 0);
     pollfd ufd;

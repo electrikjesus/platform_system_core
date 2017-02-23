@@ -120,6 +120,31 @@ std::string property_get(const char* name) {
     return value;
 }
 
+bool property_get_bool(const char *key, bool default_value) {
+    if (!key) {
+        return default_value;
+    }
+
+    bool result = default_value;
+
+    std::string string_value = property_get(key);
+    if ((string_value == "0")
+            || (string_value == "n")
+            || (string_value == "no")
+            || (string_value == "false")
+            || (string_value == "off")) {
+        result = false;
+    } else if ((string_value == "1")
+            || (string_value == "y")
+            || (string_value == "yes")
+            || (string_value == "true")
+            || (string_value == "on")) {
+        result = true;
+    }
+
+    return result;
+}
+
 static void write_persistent_property(const char *name, const char *value)
 {
     char tempPath[PATH_MAX];
