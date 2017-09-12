@@ -104,6 +104,12 @@ bool fs_mgr_get_boot_config(const std::string& key, std::string* out_val) {
         }
     }
 
+    // next check if we have "ro.*" property already
+    *out_val = android::base::GetProperty("ro." + key, "");
+    if (!out_val->empty()) {
+        return true;
+    }
+
     // next, check if we have "ro.boot" property already
     *out_val = android::base::GetProperty("ro.boot." + key, "");
     if (!out_val->empty()) {
