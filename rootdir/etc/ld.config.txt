@@ -428,7 +428,7 @@ namespace.default.link.system.shared_libs = %LLNDK_LIBRARIES%
 namespace.default.link.vndk_in_system.shared_libs = %VNDK_USING_CORE_VARIANT_LIBRARIES%
 namespace.default.link.vndk.shared_libs  = %VNDK_SAMEPROCESS_LIBRARIES%
 namespace.default.link.vndk.shared_libs += %VNDK_CORE_LIBRARIES%
-
+namespace.default.link.vndk.shared_libs += libgui.so
 ###############################################################################
 # "runtime" APEX namespace
 #
