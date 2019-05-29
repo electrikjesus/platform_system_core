@@ -1103,7 +1103,7 @@ static bool adb_root(const char* command) {
     }
 
     // Figure out whether we actually did anything.
-    char buf[256];
+/*    char buf[256];
     char* cur = buf;
     ssize_t bytes_left = sizeof(buf);
     while (bytes_left > 0) {
@@ -1128,6 +1128,7 @@ static bool adb_root(const char* command) {
     if (cur != buf && strstr(buf, "restarting") == nullptr) {
         return true;
     }
+*/
 
     // Wait for the device to go away.
     TransportType previous_type;
@@ -1135,8 +1136,9 @@ static bool adb_root(const char* command) {
     TransportId previous_id;
     adb_get_transport(&previous_type, &previous_serial, &previous_id);
 
-    adb_set_transport(kTransportAny, nullptr, transport_id);
-    wait_for_device("wait-for-disconnect");
+   // adb_set_transport(kTransportAny, nullptr, transport_id);
+    //wait_for_device("wait-for-disconnect");
+    std::this_thread::sleep_for(1s);
 
     // Wait for the device to come back.
     // If we were using a specific transport ID, there's nothing we can wait for.
@@ -1713,7 +1715,7 @@ int adb_commandline(int argc, const char** argv) {
         }
         return adb_connect_command(command);
     } else if (!strcmp(argv[0], "root") || !strcmp(argv[0], "unroot")) {
-        return adb_root(argv[0]) ? 0 : 1;
+	return adb_root(argv[0]) ? adb_query_command(format_host_command("reconnect")) : 1;
     } else if (!strcmp(argv[0], "bugreport")) {
         Bugreport bugreport;
         return bugreport.DoIt(argc, argv);

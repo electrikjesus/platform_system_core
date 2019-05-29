@@ -51,10 +51,12 @@ using namespace std::chrono_literals;
 #define MAX_PACKET_SIZE_HS 512
 #define MAX_PACKET_SIZE_SS 1024
 
-#define USB_FFS_BULK_SIZE 16384
+#define USB_FFS_BULK_SIZE (64*1024)
+#define USB_DBC_BULK_SIZE (64*1024)
 
 // Number of buffers needed to fit MAX_PAYLOAD, with an extra for ZLPs.
 #define USB_FFS_NUM_BUFS ((4 * MAX_PAYLOAD / USB_FFS_BULK_SIZE) + 1)
+#define USB_DBC_NUM_BUFS ((4 * MAX_PAYLOAD / USB_DBC_BULK_SIZE) + 1)
 
 static unique_fd& dummy_fd = *new unique_fd();
 
@@ -276,6 +278,112 @@ static void usb_ffs_close(usb_handle* h) {
     h->notify.notify_one();
 }
 
+bool init_dbc_raw(struct usb_handle* h) {
+    LOG(INFO) << "init_dbc_raw called\n";
+
+    h->bulk_out.reset(adb_open(USB_DBC_ADB_PATH, O_RDWR));
+    if (h->bulk_out < 0) {
+        D("[ %s: cannot open bulk-out ep: errno=%d ]", USB_DBC_ADB_PATH, errno);
+        goto err;
+    }
+    h->bulk_in.reset(h->bulk_out.get());
+    h->control.reset(h->bulk_out.get());
+
+    return true;
+
+err:
+    h->bulk_out.reset();
+    h->bulk_in.reset();
+    h->control.reset();
+
+    return false;
+}
+
+static void usb_dbc_open_thread(void* x) {
+    struct usb_handle* usb = (struct usb_handle*)x;
+    adb_thread_setname("usb dbc open");
+    LOG(INFO) << "dbc_open_thread called\n";
+    while (true) {
+        // wait until the USB device needs opening
+        std::unique_lock<std::mutex> lock(usb->lock);
+        while (!usb->open_new_connection) {
+            usb->notify.wait(lock);
+        }
+        usb->open_new_connection = false;
+        lock.unlock();
+
+        while (true) {
+            if (init_dbc_raw(usb)) {
+                break;
+            }
+            std::this_thread::sleep_for(1s);
+        }
+
+        LOG(INFO) << "register usb transport\n";
+        register_usb_transport(usb, 0, 0, 1);
+    }
+
+    // never gets here
+    abort();
+}
+
+static int usb_dbc_write(usb_handle* h, const void* data, int len) {
+    D("about to write (fd=%d, len=%d)", h->bulk_in.get(), len);
+
+    const char* buf = static_cast<const char*>(data);
+    int orig_len = len;
+    while (len > 0) {
+        int write_len = std::min(USB_DBC_BULK_SIZE, len);
+        int n = adb_write(h->bulk_in, buf, write_len);
+        if (n < 0) {
+            D("ERROR: fd = %d, n = %d: %s", h->bulk_in.get(), n, strerror(errno));
+            return -1;
+        }
+        buf += n;
+        len -= n;
+    }
+
+    D("[ done fd=%d ]", h->bulk_in.get());
+    return orig_len;
+}
+
+static int usb_dbc_read(usb_handle* h, void* data, int len, bool allow_partial) {
+    D("about to read (fd=%d, len=%d)", h->bulk_out.get(), len);
+
+    char* buf = static_cast<char*>(data);
+    int orig_len = len;
+    while (len > 0) {
+        int read_len = std::min(USB_DBC_BULK_SIZE, len);
+        int n = adb_read(h->bulk_out, buf, read_len);
+        if (n < 0) {
+            D("ERROR: fd = %d, n = %d: %s", h->bulk_out.get(), n, strerror(errno));
+            return -1;
+        }
+        buf += n;
+        len -= n;
+    }
+
+    D("[ done fd=%d ]", h->bulk_out.get());
+    return orig_len;
+}
+
+static void usb_dbc_kick(usb_handle* h) {
+    D("usb_dbc_kick called\n");
+
+    h->kicked = true;
+}
+
+static void usb_dbc_close(usb_handle* h) {
+    h->kicked = false;
+		D("usb_dbc_close called\n");
+    adb_close(h->bulk_out.get());
+    // Notify usb_adb_open_thread to open a new connection.
+    h->lock.lock();
+    h->open_new_connection = true;
+    h->lock.unlock();
+    h->notify.notify_one();
+}
+
 usb_handle* create_usb_handle(unsigned num_bufs, unsigned io_size) {
     usb_handle* h = new usb_handle();
 
@@ -296,12 +404,28 @@ usb_handle* create_usb_handle(unsigned num_bufs, unsigned io_size) {
     return h;
 }
 
+usb_handle* create_usb_dbc_handle(unsigned num_bufs, unsigned io_size) {
+    D("[ usb_init - using dbc ]");
+
+    usb_handle* h = new usb_handle();
+
+    h->write = usb_dbc_write;
+    h->read = usb_dbc_read;
+    h->kick = usb_dbc_kick;
+    h->close = usb_dbc_close;
+    return h;
+}
+
 void usb_init_legacy() {
     D("[ usb_init - using legacy FunctionFS ]");
     dummy_fd.reset(adb_open("/dev/null", O_WRONLY | O_CLOEXEC));
     CHECK_NE(-1, dummy_fd.get());
 
-    std::thread(usb_legacy_ffs_open_thread, create_usb_handle(USB_FFS_NUM_BUFS, USB_FFS_BULK_SIZE))
+    if (access(USB_DBC_ADB_PATH,F_OK) == 0)
+	std::thread(usb_dbc_open_thread, create_usb_dbc_handle(USB_DBC_NUM_BUFS, USB_DBC_BULK_SIZE))
+            .detach();
+    else
+	std::thread(usb_legacy_ffs_open_thread, create_usb_handle(USB_FFS_NUM_BUFS, USB_FFS_BULK_SIZE))
             .detach();
 }
 

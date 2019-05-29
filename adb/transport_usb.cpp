@@ -188,8 +188,15 @@ void init_usb_transport(atransport* t, usb_handle* h) {
     t->SetUsbHandle(h);
 }
 
-int is_adb_interface(int usb_class, int usb_subclass, int usb_protocol) {
-    return (usb_class == ADB_CLASS && usb_subclass == ADB_SUBCLASS && usb_protocol == ADB_PROTOCOL);
+int is_adb_interface(int usb_class, int usb_subclass, int usb_protocol)
+{
+
+    if ( (usb_class == ADB_CLASS && usb_subclass == ADB_SUBCLASS && usb_protocol == ADB_PROTOCOL) ||
+     (usb_class == ADB_DBC_CLASS && usb_subclass == ADB_DBC_SUBCLASS && usb_protocol == ADB_DBC_PROTOCOL))
+        return true;
+    else
+        return false;
+
 }
 
 bool should_use_libusb() {
