@@ -123,7 +123,7 @@ static enum storage_err translate_errno(int error)
     return result;
 }
 
-static ssize_t write_with_retry(int fd, const void *buf_, size_t size, off_t offset)
+ssize_t write_with_retry(int fd, const void *buf_, size_t size, off_t offset)
 {
     ssize_t rc;
     const uint8_t *buf = buf_;
@@ -136,10 +136,11 @@ static ssize_t write_with_retry(int fd, const void *buf_, size_t size, off_t off
         buf += rc;
         offset += rc;
     }
+
     return 0;
 }
 
-static ssize_t read_with_retry(int fd, void *buf_, size_t size, off_t offset)
+ssize_t read_with_retry(int fd, void *buf_, size_t size, off_t offset)
 {
     ssize_t rc;
     size_t  rcnt = 0;
@@ -469,7 +470,9 @@ int storage_init(const char *dirname)
 {
     fs_state = SS_CLEAN;
     dir_state = SS_CLEAN;
-    for (uint i = 0; i < FD_TBL_SIZE; i++) {
+    uint i = 0;
+
+    for (i = 0; i < FD_TBL_SIZE; i++) {
         fd_state[i] = SS_UNUSED;  /* uninstalled */
     }
 
@@ -486,9 +489,10 @@ int storage_init(const char *dirname)
 int storage_sync_checkpoint(void)
 {
     int rc;
+    uint fd = 0;
 
     /* sync fd table and reset it to clean state first */
-    for (uint fd = 0; fd < FD_TBL_SIZE; fd++) {
+    for (fd = 0; fd < FD_TBL_SIZE; fd++) {
          if (fd_state[fd] == SS_DIRTY) {
              if (fs_state == SS_CLEAN) {
                  /* need to sync individual fd */

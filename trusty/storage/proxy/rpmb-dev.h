@@ -17,9 +17,7 @@
 
 #include <stdint.h>
 #include <trusty/interface/storage.h>
-#include <unistd.h>
 
-int ipc_connect(const char *device, const char *service_name);
-void ipc_disconnect(void);
-ssize_t ipc_get_msg(struct storage_msg *msg, void *req_buf, size_t req_buf_len);
-int ipc_respond(struct storage_msg *msg, void *out, size_t out_size);
+int rpmb_dev_open(const char *rpmb_devname);
+int rpmb_dev_send(struct storage_msg *msg, const void *r, size_t req_len);
+void rpmb_dev_close(void);

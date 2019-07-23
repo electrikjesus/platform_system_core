@@ -20,19 +20,30 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/capability.h>
+#include <sys/sysmacros.h>
 #include <sys/prctl.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include <linux/major.h>
 
 #include <cutils/android_filesystem_config.h>
 
 #include "ipc.h"
 #include "log.h"
 #include "rpmb.h"
+#include "rpmb-dev.h"
+#include "rpmb-sim.h"
 #include "storage.h"
 
 #define REQ_BUFFER_SIZE 4096
+/* /dev/block/mmcblk1p13 */
+#define RPMB_SIM_DEV_NAME       "/dev/block/by-name/teedata"
+
 static uint8_t req_buffer[REQ_BUFFER_SIZE + 1];
+
+static unsigned int rpmb_sim;
 
 static const char* ss_data_root;
 static const char* trusty_devname;
@@ -63,46 +74,6 @@ static void show_usage_and_exit(int code) {
     ALOGE("usage: storageproxyd -d <trusty_dev> -p <data_path> -r <rpmb_dev> -t <dev_type>\n");
     ALOGE("Available dev types: mmc, virt\n");
     exit(code);
-}
-
-static int drop_privs(void) {
-    struct __user_cap_header_struct capheader;
-    struct __user_cap_data_struct capdata[2];
-
-    if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) < 0) {
-        return -1;
-    }
-
-    /*
-     * ensure we're running as the system user
-     */
-    if (setgid(AID_SYSTEM) != 0) {
-        return -1;
-    }
-
-    if (setuid(AID_SYSTEM) != 0) {
-        return -1;
-    }
-
-    /*
-     * drop all capabilities except SYS_RAWIO
-     */
-    memset(&capheader, 0, sizeof(capheader));
-    memset(&capdata, 0, sizeof(capdata));
-    capheader.version = _LINUX_CAPABILITY_VERSION_3;
-    capheader.pid = 0;
-
-    capdata[CAP_TO_INDEX(CAP_SYS_RAWIO)].permitted = CAP_TO_MASK(CAP_SYS_RAWIO);
-    capdata[CAP_TO_INDEX(CAP_SYS_RAWIO)].effective = CAP_TO_MASK(CAP_SYS_RAWIO);
-
-    if (capset(&capheader, &capdata[0]) < 0) {
-        return -1;
-    }
-
-    /* no-execute for user, no access for group and other */
-    umask(S_IXUSR | S_IRWXG | S_IRWXO);
-
-    return 0;
 }
 
 static int handle_req(struct storage_msg* msg, const void* req, size_t req_len) {
@@ -156,7 +127,10 @@ static int handle_req(struct storage_msg* msg, const void* req, size_t req_len) 
             break;
 
         case STORAGE_RPMB_SEND:
-            rc = rpmb_send(msg, req, req_len);
+            if (rpmb_sim)
+                rc = rpmb_sim_send(msg, req, req_len);
+            else
+                rc = rpmb_dev_send(msg, req, req_len);
             break;
 
         default:
@@ -237,8 +211,16 @@ static void parse_args(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
     int rc;
 
-    /* drop privileges */
-    if (drop_privs() < 0) return EXIT_FAILURE;
+    rc = rpmb_sim_open(RPMB_SIM_DEV_NAME);
+    if (rc < 0)
+        rpmb_sim = 0;
+    else
+        rpmb_sim = is_use_sim_rpmb();
+
+    if (rpmb_sim)
+        ALOGI("storage use simulation rpmb.\n");
+    else
+        ALOGI("storage use physical rpmb.\n");
 
     /* parse arguments */
     parse_args(argc, argv);
@@ -247,8 +229,11 @@ int main(int argc, char* argv[]) {
     rc = storage_init(ss_data_root);
     if (rc < 0) return EXIT_FAILURE;
 
-    /* open rpmb device */
-    rc = rpmb_open(rpmb_devname, dev_type);
+    if (!rpmb_sim) {
+        rpmb_sim_close();
+        rc = rpmb_dev_open(rpmb_devname);
+    }
+
     if (rc < 0) return EXIT_FAILURE;
 
     /* connect to Trusty secure storage server */
@@ -260,7 +245,11 @@ int main(int argc, char* argv[]) {
     ALOGE("exiting proxy loop with status (%d)\n", rc);
 
     ipc_disconnect();
-    rpmb_close();
+
+    if (rpmb_sim)
+        rpmb_sim_close();
+    else
+        rpmb_dev_close();
 
     return (rc < 0) ? EXIT_FAILURE : EXIT_SUCCESS;
 }

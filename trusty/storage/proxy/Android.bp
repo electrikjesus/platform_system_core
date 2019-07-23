@@ -21,16 +21,25 @@ cc_binary {
     srcs: [
         "ipc.c",
         "rpmb.c",
+        "rpmb-dev.c",
         "storage.c",
         "proxy.c",
+        "rpmb-sim.c",
     ],
 
-    shared_libs: ["liblog"],
-    header_libs: ["libcutils_headers"],
+    shared_libs: [
+        "liblog",
+        "libcrypto",
+    ],
 
     static_libs: [
         "libtrustystorageinterface",
         "libtrusty",
+    ],
+
+    header_libs: [
+        "liblog_headers",
+        "libcutils_headers",
     ],
 
     cflags: [

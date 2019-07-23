@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2017 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +18,8 @@
 
 #include <stdint.h>
 #include <trusty/interface/storage.h>
-#include <unistd.h>
 
-int ipc_connect(const char *device, const char *service_name);
-void ipc_disconnect(void);
-ssize_t ipc_get_msg(struct storage_msg *msg, void *req_buf, size_t req_buf_len);
-int ipc_respond(struct storage_msg *msg, void *out, size_t out_size);
+int rpmb_sim_open(const char *rpmb_devname);
+int rpmb_sim_send(struct storage_msg *msg, const void *r, size_t req_len);
+void rpmb_sim_close(void);
+int is_use_sim_rpmb(void);
