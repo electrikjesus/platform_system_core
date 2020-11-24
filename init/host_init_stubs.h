@@ -35,6 +35,9 @@
 namespace android {
 namespace init {
 
+// init.h
+extern std::string default_console;
+
 // property_service.h
 inline bool CanReadProperty(const std::string&, const std::string&) {
     return true;

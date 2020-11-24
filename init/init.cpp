@@ -97,6 +97,8 @@ namespace init {
 
 static int property_triggers_enabled = 0;
 
+std::string default_console = "/dev/console";
+
 static int signal_fd = -1;
 static int property_fd = -1;
 
@@ -472,6 +474,14 @@ static Result<void> wait_for_coldboot_done_action(const BuiltinArguments& args) 
     return {};
 }
 
+static Result<void> console_init_action(const BuiltinArguments& args) {
+    std::string console = GetProperty("ro.boot.console", "");
+    if (!console.empty()) {
+        default_console = "/dev/" + console;
+    }
+    return {};
+}
+
 static Result<void> SetupCgroupsAction(const BuiltinArguments&) {
     // Have to create <CGROUPS_RC_DIR> using make_dir function
     // for appropriate sepolicy to be set for it
@@ -821,6 +831,7 @@ int SecondStageMain(int argc, char** argv) {
                 return {};
             },
             "KeychordInit");
+    am.QueueBuiltinAction(console_init_action, "console_init");
 
     // Trigger all the boot actions to get us started.
     am.QueueEventTrigger("init");
