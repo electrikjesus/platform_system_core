@@ -143,6 +143,9 @@ passwd* getpwnam(const char* login) {  // NOLINT: implementing bad function.
 namespace android {
 namespace init {
 
+// init.h
+std::string default_console = "/dev/console";
+
 static Result<void> check_stub(const BuiltinArguments& args) {
     return {};
 }
